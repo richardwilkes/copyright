@@ -231,7 +231,11 @@ func loadFile(path string) (content *bytes.Buffer, err error) {
 			}
 		case lookForSlashStar:
 			if strings.HasPrefix(line, "/*") {
-				state = lookForStarSlash
+				if strings.HasSuffix(strings.TrimSpace(line), "*/") {
+					state = copyRemainder
+				} else {
+					state = lookForStarSlash
+				}
 			} else {
 				state = copyRemainder
 			}
