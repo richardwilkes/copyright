@@ -15,7 +15,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/richardwilkes/cmdline"
-	"github.com/richardwilkes/errors"
+	"github.com/richardwilkes/errs"
 	"github.com/richardwilkes/i18n"
 	"os"
 	"path/filepath"
@@ -39,7 +39,7 @@ var (
 )
 
 func main() {
-	errors.Detailed = false
+	errs.Detailed = false
 	cmdline.AppVersion = cmdline.NewVersionFromString(version)
 	cmdline.CopyrightYears = "2016"
 	cmdline.CopyrightHolder = "Richard A. Wilkes"
@@ -52,7 +52,7 @@ func main() {
 	cl = cmdline.New(true)
 	cl.NewStringOption(&template).SetName("template").SetSingle('t').SetArg(i18n.Text("file")).SetUsage(i18n.Text("The template to use for the copyright header. All occurrences of $YEAR$ within the template will be replaced with the current year. If this option is not specified, a default template will be used")).SetDefault("")
 	cl.NewStringOption(&extensions).SetName("extensions").SetSingle('e').SetUsage(i18n.Text("A comma-separated list of file extensions to process"))
-	cl.NewBoolOption(&errors.Detailed).SetName("debug").SetSingle('d').SetUsage(i18n.Text("Enable debugging output"))
+	cl.NewBoolOption(&errs.Detailed).SetName("debug").SetSingle('d').SetUsage(i18n.Text("Enable debugging output"))
 	cl.NewBoolOption(&quiet).SetName("quiet").SetSingle('q').SetUsage(i18n.Text("Suppress progress messages"))
 	cl.NewStringOption(&commentStyle).SetName("style").SetSingle('s').SetUsage(fmt.Sprintf(i18n.Text("The style of comment to use for the copyright header. Choices are '%s' for // ... comments, '%s' for /* ... */ comments, and '%s' for # ... comments"), single, multi, hash))
 	cl.NewStringOption(&year).SetName("year").SetSingle('y').SetUsage(i18n.Text("The year(s) to use in the copyright notice"))
@@ -96,7 +96,7 @@ defined by the Mozilla Public License, version 2.0.`
 
 	for _, target := range targets {
 		if err := filepath.Walk(target, processFile); err != nil {
-			cl.FatalError(errors.Wrap(err))
+			cl.FatalError(errs.Wrap(err))
 		}
 	}
 }
@@ -105,12 +105,12 @@ func loadTemplate() string {
 	var file *os.File
 	var err error
 	if file, err = os.Open(template); err != nil {
-		cl.FatalError(errors.NewWithCause(i18n.Text("Unable to open the template file."), err))
+		cl.FatalError(errs.NewWithCause(i18n.Text("Unable to open the template file."), err))
 	}
 	defer file.Close()
 	var fi os.FileInfo
 	if fi, err = file.Stat(); err != nil {
-		cl.FatalError(errors.Wrap(err))
+		cl.FatalError(errs.Wrap(err))
 	}
 	if fi.IsDir() {
 		cl.FatalMsg(i18n.Text("The template must be a file."))
@@ -118,7 +118,7 @@ func loadTemplate() string {
 	buffer := make([]byte, fi.Size())
 	var read int
 	if read, err = file.Read(buffer); err != nil || read != len(buffer) {
-		cl.FatalError(errors.NewWithCause(i18n.Text("Unable to read template file."), err))
+		cl.FatalError(errs.NewWithCause(i18n.Text("Unable to read template file."), err))
 	}
 	return string(buffer)
 }
@@ -149,14 +149,14 @@ func processTemplate(year string) string {
 		buffer.WriteString(" */\n")
 	}
 	if err := scanner.Err(); err != nil {
-		cl.FatalError(errors.NewWithCause(i18n.Text("Unable to process template."), err))
+		cl.FatalError(errs.NewWithCause(i18n.Text("Unable to process template."), err))
 	}
 	return buffer.String()
 }
 
 func processFile(path string, fi os.FileInfo, err error) error {
 	if err != nil {
-		return errors.Wrap(err)
+		return errs.Wrap(err)
 	}
 	if fi.IsDir() {
 		path = filepath.Base(path)
@@ -168,25 +168,25 @@ func processFile(path string, fi os.FileInfo, err error) error {
 	if extMap[filepath.Ext(path)] {
 		var buffer *bytes.Buffer
 		if buffer, err = loadFile(path); err != nil {
-			return errors.Wrap(err)
+			return errs.Wrap(err)
 		}
 		var out *os.File
 		if out, err = os.Create(path); err != nil {
-			return errors.Wrap(err)
+			return errs.Wrap(err)
 		}
 		defer out.Close()
 		if _, err = out.WriteString(template); err != nil {
-			return errors.Wrap(err)
+			return errs.Wrap(err)
 		}
 		if buffer.Len() > 0 {
 			bytes := buffer.Bytes()
 			if bytes[0] != '\n' {
 				if _, err = out.WriteString("\n"); err != nil {
-					return errors.Wrap(err)
+					return errs.Wrap(err)
 				}
 			}
 			if _, err = buffer.WriteTo(out); err != nil {
-				return errors.Wrap(err)
+				return errs.Wrap(err)
 			}
 		}
 		if !quiet {
@@ -199,7 +199,7 @@ func processFile(path string, fi os.FileInfo, err error) error {
 func loadFile(path string) (content *bytes.Buffer, err error) {
 	var file *os.File
 	if file, err = os.Open(path); err != nil {
-		return nil, errors.Wrap(err)
+		return nil, errs.Wrap(err)
 	}
 	defer file.Close()
 	var buffer bytes.Buffer
@@ -255,7 +255,7 @@ func loadFile(path string) (content *bytes.Buffer, err error) {
 		}
 	}
 	if err = scanner.Err(); err != nil {
-		return nil, errors.Wrap(err)
+		return nil, errs.Wrap(err)
 	}
 	return &buffer, nil
 }
