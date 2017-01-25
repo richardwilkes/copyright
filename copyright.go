@@ -1,4 +1,4 @@
-// Copyright (c) 2016 by Richard A. Wilkes. All rights reserved.
+// Copyright (c) 2016-2017 by Richard A. Wilkes. All rights reserved.
 //
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, version 2.0. If a copy of the MPL was not distributed with
@@ -14,13 +14,16 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/richardwilkes/cmdline"
-	"github.com/richardwilkes/errs"
-	"github.com/richardwilkes/i18n"
+	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/richardwilkes/cmdline"
+	"github.com/richardwilkes/errs"
+	"github.com/richardwilkes/i18n"
 )
 
 const (
@@ -41,7 +44,7 @@ var (
 func main() {
 	errs.Detailed = false
 	cmdline.AppVersion = cmdline.NewVersionFromString(version)
-	cmdline.CopyrightYears = "2016"
+	cmdline.CopyrightYears = "2016-2017"
 	cmdline.CopyrightHolder = "Richard A. Wilkes"
 	cmdline.License = "Mozilla Public License 2.0"
 
@@ -101,13 +104,19 @@ defined by the Mozilla Public License, version 2.0.`
 	}
 }
 
+func closeLoggingError(closer io.Closer) {
+	if err := closer.Close(); err != nil {
+		log.Print(err)
+	}
+}
+
 func loadTemplate() string {
 	var file *os.File
 	var err error
 	if file, err = os.Open(template); err != nil {
 		cl.FatalError(errs.NewWithCause(i18n.Text("Unable to open the template file."), err))
 	}
-	defer file.Close()
+	defer closeLoggingError(file)
 	var fi os.FileInfo
 	if fi, err = file.Stat(); err != nil {
 		cl.FatalError(errs.Wrap(err))
@@ -174,7 +183,7 @@ func processFile(path string, fi os.FileInfo, err error) error {
 		if out, err = os.Create(path); err != nil {
 			return errs.Wrap(err)
 		}
-		defer out.Close()
+		defer closeLoggingError(out)
 		if _, err = out.WriteString(template); err != nil {
 			return errs.Wrap(err)
 		}
@@ -201,7 +210,7 @@ func loadFile(path string) (content *bytes.Buffer, err error) {
 	if file, err = os.Open(path); err != nil {
 		return nil, errs.Wrap(err)
 	}
-	defer file.Close()
+	defer closeLoggingError(file)
 	var buffer bytes.Buffer
 	const (
 		lookForSlashSlash = iota
