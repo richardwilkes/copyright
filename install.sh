@@ -13,7 +13,7 @@ if which genversion 2>&1 > /dev/null; then
         GIT_VERSION=Unknown
     fi
     touch copyright.go
-    go install -v -ldflags "-X main.version=$VERSION -X github.com/richardwilkes/cmdline.GitVersion=$GIT_VERSION"
+    go install -v -ldflags "-X github.com/richardwilkes/cmdline.AppVersion=$VERSION -X github.com/richardwilkes/cmdline.GitVersion=$GIT_VERSION"
 else
     echo You must install genversion first:
     echo ""

@@ -33,7 +33,6 @@ const (
 )
 
 var (
-	version      string
 	cl           *cmdline.CmdLine
 	commentStyle = single
 	extMap       = make(map[string]bool)
@@ -43,7 +42,6 @@ var (
 
 func main() {
 	errs.Detailed = false
-	cmdline.AppVersion = cmdline.NewVersionFromString(version)
 	cmdline.CopyrightYears = "2016-2017"
 	cmdline.CopyrightHolder = "Richard A. Wilkes"
 	cmdline.License = "Mozilla Public License 2.0"
