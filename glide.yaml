@@ -1,0 +1,12 @@
+package: github.com/richardwilkes/copyright
+license: MPL-2.0
+owners:
+- name: Richard Wilkes
+  email: wilkes@me.com
+import:
+- package: github.com/richardwilkes/cmdline
+  version: ^1.1.1
+- package: github.com/richardwilkes/errs
+  version: ^1.0.0
+- package: github.com/richardwilkes/i18n
+  version: ^1.0.0
