@@ -21,9 +21,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/richardwilkes/cmdline"
-	"github.com/richardwilkes/errs"
-	"github.com/richardwilkes/i18n"
+	"github.com/richardwilkes/toolbox/cmdline"
+	"github.com/richardwilkes/toolbox/errs"
+	"github.com/richardwilkes/toolbox/i18n"
 )
 
 const (
