@@ -41,6 +41,8 @@ var (
 )
 
 func main() {
+	cmdline.AppName = "Copyright"
+	cmdline.AppVersion = "1.0.1"
 	cmdline.CopyrightYears = "2016-2017"
 	cmdline.CopyrightHolder = "Richard A. Wilkes"
 	cmdline.License = "Mozilla Public License 2.0"

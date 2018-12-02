@@ -1,8 +1,0 @@
-version: "1.0"
-dependencies:
-- import: github.com/kardianos/osext
-  commit: ae77be60afb1dcacde03767a8c37337fad28ac14
-- import: github.com/pkg/term
-  commit: b1f72af2d63057363398bec5873d16a98b453312
-- import: github.com/richardwilkes/toolbox
-  commit: c9ec1b79a188be62b77095c4a61750f7c48d5ec5
