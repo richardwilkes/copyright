@@ -1,0 +1,68 @@
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+output:
+  sort-results: true
+linters-settings:
+  depguard:
+    list-type: blacklist
+    include-go-root: true
+    packages:
+      - log
+      - github.com/satori/go.uuid
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  gofumpt:
+    extra-rules: true
+  govet:
+    check-shadowing: true
+    enable-all: true
+    settings:
+      printf:
+        funcs:
+          - Errorf
+          - Warnf
+          - Infof
+          - Debugf
+          - Fatalf
+          - StartRootSpanf
+          - StartSubSpanf
+          - EndWithMsgf
+          - Newf
+          - NewWithCausef
+  misspell:
+    locale: US
+  staticcheck:
+    go: "1.18"
+    checks: [ "all", "-SA3000" ]
+  unused:
+    check-exported: false
+linters:
+  disable-all: true
+  enable:
+    - depguard
+    - errcheck
+    - errorlint
+    - exportloopref
+    - goconst
+    - gofumpt
+    - goimports
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - noctx
+    - prealloc
+    - predeclared
+    - revive
+    - staticcheck
+    - typecheck
+    - unconvert
+    - unused
+issues:
+  max-same-issues: 10
+  exclude-use-default: false
+  exclude:
+    - "fieldalignment: struct with \\d+ pointer bytes could be"
+    - "package-comments: should have a package comment"

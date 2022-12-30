@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2017 by Richard A. Wilkes. All rights reserved.
+// Copyright (c) 2016-2022 by Richard A. Wilkes. All rights reserved.
 //
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, version 2.0. If a copy of the MPL was not distributed with
@@ -15,7 +15,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -43,7 +42,7 @@ var (
 func main() {
 	cmdline.AppName = "Copyright"
 	cmdline.AppVersion = "1.0.1"
-	cmdline.CopyrightYears = "2016-2017"
+	cmdline.CopyrightStartYear = "2016"
 	cmdline.CopyrightHolder = "Richard A. Wilkes"
 	cmdline.License = "Mozilla Public License 2.0"
 
@@ -52,11 +51,11 @@ func main() {
 		year       = fmt.Sprintf("%d", time.Now().Year())
 	)
 	cl = cmdline.New(true)
-	cl.NewStringOption(&template).SetName("template").SetSingle('t').SetArg(i18n.Text("file")).SetUsage(i18n.Text("The template to use for the copyright header. All occurrences of $YEAR$ within the template will be replaced with the current year. If this option is not specified, a default template will be used")).SetDefault("")
-	cl.NewStringOption(&extensions).SetName("extensions").SetSingle('e').SetUsage(i18n.Text("A comma-separated list of file extensions to process"))
-	cl.NewBoolOption(&quiet).SetName("quiet").SetSingle('q').SetUsage(i18n.Text("Suppress progress messages"))
-	cl.NewStringOption(&commentStyle).SetName("style").SetSingle('s').SetUsage(fmt.Sprintf(i18n.Text("The style of comment to use for the copyright header. Choices are '%s' for // ... comments, '%s' for /* ... */ comments, and '%s' for # ... comments"), single, multi, hash))
-	cl.NewStringOption(&year).SetName("year").SetSingle('y').SetUsage(i18n.Text("The year(s) to use in the copyright notice"))
+	cl.NewGeneralOption(&template).SetName("template").SetSingle('t').SetArg(i18n.Text("file")).SetUsage(i18n.Text("The template to use for the copyright header. All occurrences of $YEAR$ within the template will be replaced with the current year. If this option is not specified, a default template will be used")).SetDefault("")
+	cl.NewGeneralOption(&extensions).SetName("extensions").SetSingle('e').SetUsage(i18n.Text("A comma-separated list of file extensions to process"))
+	cl.NewGeneralOption(&quiet).SetName("quiet").SetSingle('q').SetUsage(i18n.Text("Suppress progress messages"))
+	cl.NewGeneralOption(&commentStyle).SetName("style").SetSingle('s').SetUsage(fmt.Sprintf(i18n.Text("The style of comment to use for the copyright header. Choices are '%s' for // ... comments, '%s' for /* ... */ comments, and '%s' for # ... comments"), single, multi, hash))
+	cl.NewGeneralOption(&year).SetName("year").SetSingle('y').SetUsage(i18n.Text("The year(s) to use in the copyright notice"))
 	cl.UsageSuffix = i18n.Text("<dir | file>...")
 	cl.Description = i18n.Text("Inserts and adjusts copyright notices in source files.")
 	targets := cl.Parse(os.Args[1:])
@@ -104,7 +103,7 @@ defined by the Mozilla Public License, version 2.0.`
 
 func closeLoggingError(closer io.Closer) {
 	if err := closer.Close(); err != nil {
-		log.Print(err)
+		fmt.Println(err)
 	}
 }
 
@@ -186,8 +185,8 @@ func processFile(path string, fi os.FileInfo, err error) error {
 			return errs.Wrap(err)
 		}
 		if buffer.Len() > 0 {
-			bytes := buffer.Bytes()
-			if bytes[0] != '\n' {
+			data := buffer.Bytes()
+			if data[0] != '\n' {
 				if _, err = out.WriteString("\n"); err != nil {
 					return errs.Wrap(err)
 				}
