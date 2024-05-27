@@ -1,4 +1,4 @@
-// Copyright (c) 2016-2024 by Richard A. Wilkes. All rights reserved.
+// Copyright (c) 1996-2024 by Richard A. Wilkes. All rights reserved.
 //
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, version 2.0. If a copy of the MPL was not distributed with
@@ -41,7 +41,7 @@ var (
 
 func main() {
 	cmdline.AppName = "Copyright"
-	cmdline.AppVersion = "1.0.1"
+	cmdline.AppVersion = "1.0.2"
 	cmdline.CopyrightStartYear = "2016"
 	cmdline.CopyrightHolder = "Richard A. Wilkes"
 	cmdline.License = "Mozilla Public License 2.0"
@@ -208,60 +208,78 @@ func loadFile(path string) (content *bytes.Buffer, err error) {
 		return nil, errs.Wrap(err)
 	}
 	defer closeLoggingError(file)
-	var buffer bytes.Buffer
+	var contentBuffer, trimmedBuffer bytes.Buffer
 	const (
-		lookForSlashSlash = iota
-		lookForSlashStar
+		lookForAny = iota
+		lookForSlashSlash
 		lookForStarSlash
 		lookForHash
 		copyRemainder
 	)
-	var state int
-	switch commentStyle {
-	case multi:
-		state = lookForSlashStar
-	case hash:
-		state = lookForHash
-	default:
-		state = lookForSlashSlash
-	}
+	state := lookForAny
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
 		switch state {
-		case lookForSlashSlash:
-			if !strings.HasPrefix(line, "//") {
-				buffer.WriteString(line)
-				buffer.WriteString("\n")
-				state = copyRemainder
-			}
-		case lookForSlashStar:
-			if strings.HasPrefix(line, "/*") {
+		case lookForAny:
+			switch {
+			case strings.HasPrefix(line, "//"):
+				trimmedBuffer.WriteString(line)
+				trimmedBuffer.WriteString("\n")
+				state = lookForSlashSlash
+			case strings.HasPrefix(line, "/*"):
+				trimmedBuffer.WriteString(line)
+				trimmedBuffer.WriteString("\n")
 				if strings.HasSuffix(strings.TrimSpace(line), "*/") {
 					state = copyRemainder
 				} else {
 					state = lookForStarSlash
 				}
+			case strings.HasPrefix(line, "#"):
+				trimmedBuffer.WriteString(line)
+				trimmedBuffer.WriteString("\n")
+				state = lookForHash
+			default:
+				contentBuffer.WriteString(line)
+				contentBuffer.WriteString("\n")
+				state = copyRemainder
+			}
+		case lookForSlashSlash:
+			if strings.HasPrefix(line, "//") {
+				trimmedBuffer.WriteString(line)
+				trimmedBuffer.WriteString("\n")
 			} else {
+				contentBuffer.WriteString(line)
+				contentBuffer.WriteString("\n")
 				state = copyRemainder
 			}
 		case lookForStarSlash:
+			trimmedBuffer.WriteString(line)
+			trimmedBuffer.WriteString("\n")
 			if strings.HasSuffix(strings.TrimSpace(line), "*/") {
 				state = copyRemainder
 			}
 		case lookForHash:
-			if !strings.HasPrefix(line, "#") {
-				buffer.WriteString(line)
-				buffer.WriteString("\n")
+			if strings.HasPrefix(line, "#") {
+				trimmedBuffer.WriteString(line)
+				trimmedBuffer.WriteString("\n")
+			} else {
+				contentBuffer.WriteString(line)
+				contentBuffer.WriteString("\n")
 				state = copyRemainder
 			}
 		case copyRemainder:
-			buffer.WriteString(line)
-			buffer.WriteString("\n")
+			contentBuffer.WriteString(line)
+			contentBuffer.WriteString("\n")
 		}
 	}
 	if err = scanner.Err(); err != nil {
 		return nil, errs.Wrap(err)
 	}
-	return &buffer, nil
+	trimmed := trimmedBuffer.Bytes()
+	if !bytes.Contains(trimmed, []byte("opyright")) {
+		trimmedBuffer.Write(contentBuffer.Bytes())
+		return &trimmedBuffer, nil
+	}
+	return &contentBuffer, nil
 }
