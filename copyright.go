@@ -131,7 +131,7 @@ func loadTemplate() string {
 
 func processTemplate(year string) string {
 	var buffer bytes.Buffer
-	scanner := bufio.NewScanner(strings.NewReader(strings.Replace(template, "$YEAR$", year, -1)))
+	scanner := bufio.NewScanner(strings.NewReader(strings.ReplaceAll(template, "$YEAR$", year)))
 	var prefix string
 	switch commentStyle {
 	case multi:
