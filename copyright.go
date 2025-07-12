@@ -7,22 +7,24 @@
 // This Source Code Form is "Incompatible With Secondary Licenses", as
 // defined by the Mozilla Public License, version 2.0.
 
-// copyright inserts and adjusts copyright notices in source files.
 package main
 
 import (
 	"bufio"
 	"bytes"
+	"flag"
 	"fmt"
-	"io"
+	"io/fs"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/richardwilkes/toolbox/cmdline"
-	"github.com/richardwilkes/toolbox/errs"
-	"github.com/richardwilkes/toolbox/i18n"
+	"github.com/richardwilkes/toolbox/v2/errs"
+	"github.com/richardwilkes/toolbox/v2/xflag"
+	"github.com/richardwilkes/toolbox/v2/xio"
+	"github.com/richardwilkes/toolbox/v2/xos"
 )
 
 const (
@@ -31,41 +33,43 @@ const (
 	hash   = "hash"
 )
 
-var (
-	cl           *cmdline.CmdLine
-	commentStyle = single
-	extMap       = make(map[string]bool)
-	template     string
-	quiet        bool
-)
-
 func main() {
-	cmdline.AppName = "Copyright"
-	cmdline.AppVersion = "1.1.0"
-	cmdline.CopyrightStartYear = "2016"
-	cmdline.CopyrightHolder = "Richard A. Wilkes"
-	cmdline.License = "Mozilla Public License 2.0"
+	xos.AppName = "Copyright"
+	xos.AppVersion = "1.2.0"
+	xos.CopyrightStartYear = "2016"
+	xos.CopyrightHolder = "Richard A. Wilkes"
+	xos.License = "Mozilla Public License 2.0"
 
-	var (
-		extensions = "go"
-		year       = fmt.Sprintf("%d", time.Now().Year())
-	)
-	cl = cmdline.New(true)
-	cl.NewGeneralOption(&template).SetName("template").SetSingle('t').SetArg(i18n.Text("file")).SetUsage(i18n.Text("The template to use for the copyright header. All occurrences of $YEAR$ within the template will be replaced with the current year. If this option is not specified, a default template will be used")).SetDefault("")
-	cl.NewGeneralOption(&extensions).SetName("extensions").SetSingle('e').SetUsage(i18n.Text("A comma-separated list of file extensions to process"))
-	cl.NewGeneralOption(&quiet).SetName("quiet").SetSingle('q').SetUsage(i18n.Text("Suppress progress messages"))
-	cl.NewGeneralOption(&commentStyle).SetName("style").SetSingle('s').SetUsage(fmt.Sprintf(i18n.Text("The style of comment to use for the copyright header. Choices are '%s' for // ... comments, '%s' for /* ... */ comments, and '%s' for # ... comments"), single, multi, hash))
-	cl.NewGeneralOption(&year).SetName("year").SetSingle('y').SetUsage(i18n.Text("The year(s) to use in the copyright notice"))
-	cl.UsageSuffix = i18n.Text("<dir | file>...")
-	cl.Description = i18n.Text("Inserts and adjusts copyright notices in source files.")
-	targets := cl.Parse(os.Args[1:])
-
+	var tmpl string
+	commentStyle := single
+	extMap := make(map[string]bool)
+	quiet := false
+	extensions := "go"
+	years := fmt.Sprintf("%d", time.Now().Year())
+	authors := os.Getenv("USER")
+	if u, err := user.Current(); err == nil {
+		authors = u.Name
+	}
+	xflag.SetUsage(nil, "Inserts and adjusts copyright notices in source files.", "<dir | file>...")
+	xflag.AddVersionFlags()
+	flag.StringVar(&tmpl, "template", "",
+		"The template `file` to use for the copyright header. All occurrences of $YEAR$ within the template will be replaced with the current year. If this option is not specified, a default template will be used")
+	flag.StringVar(&extensions, "extensions", extensions, "A comma-separated list of file `extensions` to process")
+	flag.BoolVar(&quiet, "quiet", false, "Suppress progress messages")
+	flag.StringVar(&commentStyle, "style", single,
+		fmt.Sprintf("The style of comment to use for the copyright header. Possible `choice`s are '%s' for // ... comments, '%s' for /* ... */ comments, and '%s' for # ... comments", single, multi, hash))
+	flag.StringVar(&years, "year", years,
+		"One or more `years` to use in the copyright notice (e.g. '2025', '2019, 2025', '2019-2025', etc)")
+	flag.StringVar(&authors, "author", authors,
+		"The `names` of one or more authors to use in the copyright notice")
+	xflag.Parse()
+	targets := flag.Args()
 	if len(targets) == 0 {
-		cl.FatalMsg(i18n.Text("At least one directory or file must be specified."))
+		xos.ExitWithMsg("at least one directory or file must be specified")
 	}
 
 	if commentStyle != single && commentStyle != multi && commentStyle != hash {
-		cl.FatalMsg(fmt.Sprintf(i18n.Text("The style option must be one of: %s, %s, %s"), single, multi, hash))
+		xos.ExitWithMsg(fmt.Sprintf("style must be one of: %s, %s, %s", single, multi, hash))
 	}
 
 	for _, ext := range strings.Split(extensions, ",") {
@@ -77,13 +81,15 @@ func main() {
 		}
 	}
 	if len(extMap) == 0 {
-		cl.FatalMsg(i18n.Text("The extensions option must specify at least one extension."))
+		xos.ExitWithMsg("extensions must specify at least one extension.")
 	}
 
-	if template != "" {
-		template = loadTemplate()
+	if tmpl != "" {
+		templateBytes, err := os.ReadFile(tmpl)
+		xos.ExitIfErr(err)
+		tmpl = string(templateBytes)
 	} else {
-		template = `Copyright (c) $YEAR$ by Richard A. Wilkes. All rights reserved.
+		tmpl = `Copyright (c) {{.Years}} by {{.Authors}}. All rights reserved.
 
 This Source Code Form is subject to the terms of the Mozilla Public
 License, version 2.0. If a copy of the MPL was not distributed with
@@ -92,46 +98,57 @@ this file, You can obtain one at http://mozilla.org/MPL/2.0/.
 This Source Code Form is "Incompatible With Secondary Licenses", as
 defined by the Mozilla Public License, version 2.0.`
 	}
-	template = processTemplate(year)
-
+	tmpl = processTemplate(tmpl, commentStyle, years, authors)
 	for _, target := range targets {
-		if err := filepath.Walk(target, processFile); err != nil {
-			cl.FatalError(errs.Wrap(err))
-		}
+		xos.ExitIfErr(filepath.Walk(target, func(path string, fi fs.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if fi.IsDir() {
+				path = filepath.Base(path)
+				if path != "." && path != ".." && strings.HasPrefix(path, ".") {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if extMap[filepath.Ext(path)] {
+				var buffer *bytes.Buffer
+				if buffer, err = loadFile(path); err != nil {
+					return err
+				}
+				var out *os.File
+				if out, err = os.Create(path); err != nil {
+					return err
+				}
+				defer xio.CloseLoggingErrors(out)
+				if _, err = out.WriteString(tmpl); err != nil {
+					return err
+				}
+				if buffer.Len() > 0 {
+					data := buffer.Bytes()
+					if data[0] != '\n' {
+						if _, err = out.WriteString("\n"); err != nil {
+							return err
+						}
+					}
+					if _, err = buffer.WriteTo(out); err != nil {
+						return errs.Wrap(err)
+					}
+				}
+				if !quiet {
+					fmt.Printf("Updated %s\n", path)
+				}
+			}
+			return nil
+		}))
 	}
 }
 
-func closeLoggingError(closer io.Closer) {
-	if err := closer.Close(); err != nil {
-		fmt.Println(err)
-	}
-}
-
-func loadTemplate() string {
-	var file *os.File
-	var err error
-	if file, err = os.Open(template); err != nil {
-		cl.FatalError(errs.NewWithCause(i18n.Text("Unable to open the template file."), err))
-	}
-	defer closeLoggingError(file)
-	var fi os.FileInfo
-	if fi, err = file.Stat(); err != nil {
-		cl.FatalError(errs.Wrap(err))
-	}
-	if fi.IsDir() {
-		cl.FatalMsg(i18n.Text("The template must be a file."))
-	}
-	buffer := make([]byte, fi.Size())
-	var read int
-	if read, err = file.Read(buffer); err != nil || read != len(buffer) {
-		cl.FatalError(errs.NewWithCause(i18n.Text("Unable to read template file."), err))
-	}
-	return string(buffer)
-}
-
-func processTemplate(year string) string {
+func processTemplate(tmpl, commentStyle, years, authors string) string {
 	var buffer bytes.Buffer
-	scanner := bufio.NewScanner(strings.NewReader(strings.ReplaceAll(template, "$YEAR$", year)))
+	tmpl = strings.ReplaceAll(tmpl, "{{.Years}}", years)
+	tmpl = strings.ReplaceAll(tmpl, "{{.Authors}}", authors)
+	scanner := bufio.NewScanner(strings.NewReader(tmpl))
 	var prefix string
 	switch commentStyle {
 	case multi:
@@ -154,60 +171,16 @@ func processTemplate(year string) string {
 	if commentStyle == multi {
 		buffer.WriteString(" */\n")
 	}
-	if err := scanner.Err(); err != nil {
-		cl.FatalError(errs.NewWithCause(i18n.Text("Unable to process template."), err))
-	}
+	xos.ExitIfErr(scanner.Err())
 	return buffer.String()
 }
 
-func processFile(path string, fi os.FileInfo, err error) error {
-	if err != nil {
-		return errs.Wrap(err)
-	}
-	if fi.IsDir() {
-		path = filepath.Base(path)
-		if path != "." && path != ".." && strings.HasPrefix(path, ".") {
-			return filepath.SkipDir
-		}
-		return nil
-	}
-	if extMap[filepath.Ext(path)] {
-		var buffer *bytes.Buffer
-		if buffer, err = loadFile(path); err != nil {
-			return errs.Wrap(err)
-		}
-		var out *os.File
-		if out, err = os.Create(path); err != nil {
-			return errs.Wrap(err)
-		}
-		defer closeLoggingError(out)
-		if _, err = out.WriteString(template); err != nil {
-			return errs.Wrap(err)
-		}
-		if buffer.Len() > 0 {
-			data := buffer.Bytes()
-			if data[0] != '\n' {
-				if _, err = out.WriteString("\n"); err != nil {
-					return errs.Wrap(err)
-				}
-			}
-			if _, err = buffer.WriteTo(out); err != nil {
-				return errs.Wrap(err)
-			}
-		}
-		if !quiet {
-			fmt.Printf(i18n.Text("Updated %s\n"), path)
-		}
-	}
-	return nil
-}
-
 func loadFile(path string) (content *bytes.Buffer, err error) {
-	var file *os.File
-	if file, err = os.Open(path); err != nil {
+	var f *os.File
+	if f, err = os.Open(path); err != nil {
 		return nil, errs.Wrap(err)
 	}
-	defer closeLoggingError(file)
+	defer xio.CloseIgnoringErrors(f)
 	var contentBuffer, trimmedBuffer bytes.Buffer
 	const (
 		lookForAny = iota
@@ -217,7 +190,7 @@ func loadFile(path string) (content *bytes.Buffer, err error) {
 		copyRemainder
 	)
 	state := lookForAny
-	scanner := bufio.NewScanner(file)
+	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()
 		switch state {
